@@ -13,11 +13,11 @@ std_path  = BASE_DIR + "vae_std.npy"
 
 # ===== 超参数 =====
 input_dim = 2048
-latent_dim = 512
+latent_dim = 1024
 batch_size = 128
-epochs = 200
+epochs = 1000
 lr = 1e-3
-beta = 0.1   # ⭐ 关键（比标准VAE更适合你）
+beta = 0.1   #  关键（比标准VAE更适合你）
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -93,8 +93,7 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     mode='min',
     factor=0.5,
     patience=10,
-    min_lr=1e-5,
-    verbose=True
+    min_lr=1e-5
 )
 
 
@@ -114,7 +113,7 @@ for epoch in range(epochs):
         optimizer.zero_grad()
         loss.backward()
 
-        # ⭐ 防止梯度爆炸
+        # 防止梯度爆炸
         torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
 
         optimizer.step()

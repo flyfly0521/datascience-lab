@@ -60,6 +60,7 @@ vector<vector<double>> pca_reduce(
     const vector<vector<double>>& X,
     int k // 目标维度
 );
+double poly_kernel_avx2(const double* x1, const double* x2, int d);
 
 //main
 int main() {
@@ -75,10 +76,6 @@ int main() {
     if (!load_data(train_feat_file, train_label_file, X, y)) {
         return 1;
     }
-    //特征降维
-    d = 512;
-    //X = fisher_selection(X, y, d); //feature selection:Fisher Selection
-    //X = pca_reduce(X, d); //feature projection:PCA
     cout << "Loaded training data: " << X.size() << " samples, " 
          << X[0].size() << " features." << endl;
 
@@ -94,7 +91,6 @@ int main() {
 
     // --- 定义 C-list ---
     vector<double> C_list = {1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100, 1000,10000};
-    //vector<double> C_list = {1e4, 1e3, 1e2, 1e1, 1, 1e-1, 1e-2, 1e-3, 1e-4};
     int K = 10;  // 10-fold cross-validation
 
     for (double C : C_list) {
@@ -487,7 +483,35 @@ bool load_data(const string& feature_file,
 
     return true;
 }
+//polynomial kernel
+double poly_kernel_avx2(const double* x1, const double* x2, int d) {
+    double gamma = 1.0;
+    double coef0 = 1.0;
+    int degree = 3;
+    __m256d sum_vec = _mm256_setzero_pd(); // 初始化向量累加器
+    int i = 0;
 
+    // 向量化循环，每次处理4个 double
+    for (; i + 3 < d; i += 4) {
+    __m256d a = _mm256_loadu_pd(x1 + i);
+    __m256d b = _mm256_loadu_pd(x2 + i);
+    sum_vec = _mm256_add_pd(sum_vec, _mm256_mul_pd(a, b));
+    }
+
+    // 横向累加 sum_vec
+    double tmp[4];
+    _mm256_storeu_pd(tmp, sum_vec);
+    double sum = tmp[0] + tmp[1] + tmp[2] + tmp[3];
+
+    // 处理尾部元素
+    for (; i < d; ++i) {
+    sum += x1[i] * x2[i];
+    }
+
+    // 多项式核公式
+    double kernel = pow(gamma * sum + coef0, degree);
+    return kernel;
+}
 // AVX2 RBF kernel for double precision
 double rbf_kernel_avx2(const double* x1, const double* x2, int d) {
     __m256d sum_vec = _mm256_setzero_pd(); // 初始化向量累加器

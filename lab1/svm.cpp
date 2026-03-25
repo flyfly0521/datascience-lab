@@ -64,7 +64,16 @@ struct PCA_Model {
     Eigen::RowVectorXd mean;  // 均值 (1 × d)
     Eigen::MatrixXd Vk;       // 主成分 (d × k)
 };
-
+vector<int> fisher_fit(const vector<vector<double>>& X, const vector<int>& y, int k);
+vector<vector<double>> fisher_transform(const vector<vector<double>>& X, const vector<int>& indices);
+vector<vector<double>> pca_transform(
+    const vector<vector<double>>& X,
+    const PCA_Model& model
+);
+PCA_Model pca_fit(
+    const vector<vector<double>>& X,
+    int k
+);
 //main
 int main() {
     string BASE_DIR = "/mnt/sdb1/feiyang/datascience/lab1/Animals_with_Attributes2/Features/ResNet101/";
@@ -95,9 +104,24 @@ int main() {
 
     cout << "Loaded test data: " << X_test.size()
          << " samples, " << X_test[0].size() << " features." << endl;
-    /* 
-    // ===== 3. 正确 PCA（fit + transform）=====
-    int target_dim = 512;
+
+    /*
+    // ... 加载数据后 ...
+    int target_dim = 1024;
+    cout << "Selecting top " << target_dim << " features via Fisher Score..." << endl;
+
+    // 第一步：基于训练集计算最优特征索引
+    vector<int> best_indices = fisher_fit(X_train, y_train, target_dim);
+
+    // 第二步：同时转换训练集和测试集
+    X_train = fisher_transform(X_train, best_indices);
+    X_test  = fisher_transform(X_test, best_indices); 
+
+    d = target_dim; // 更新维度变量
+    */
+    /*
+    //===== 3. 正确 PCA（fit + transform）=====
+    int target_dim = 1024;
 
     cout << "Running PCA..." << endl;
 
@@ -114,6 +138,8 @@ int main() {
 
     cout << "After PCA: " << d << " dimensions." << endl;
     */
+
+    //d = 1024; //change d when using vae
     // ===== 4. 训练 One-vs-Rest SVM =====
     const int num_classes = 50;
     double C = 1.0;
@@ -637,5 +663,73 @@ vector<vector<double>> pca_transform(
         for (int j = 0; j < k; j++)
             X_new[i][j] = reduced(i, j);
 
+    return X_new;
+}
+
+vector<int> fisher_fit(const vector<vector<double>>& X, const vector<int>& y, int k) {
+    int n = X.size();
+    int d = X[0].size();
+    vector<double> scores(d, 0.0);
+    
+    // 获取所有类别列表
+    set<int> classes(y.begin(), y.end());
+
+    for (int j = 0; j < d; j++) {
+        double global_mean = 0;
+        for (int i = 0; i < n; i++) global_mean += X[i][j];
+        global_mean /= n;
+
+        double between_class_var = 0; // 分子：类间方差
+        double within_class_var = 0;  // 分母：类内方差
+
+        for (int c : classes) {
+            double mean_c = 0;
+            int count_c = 0;
+            for (int i = 0; i < n; i++) {
+                if (y[i] == c) {
+                    mean_c += X[i][j];
+                    count_c++;
+                }
+            }
+
+            if (count_c <= 1) continue; 
+            mean_c /= count_c;
+
+            // 类间：各类均值与全局均值的距离
+            between_class_var += count_c * (mean_c - global_mean) * (mean_c - global_mean);
+
+            // 类内：类内样本与其均值的距离
+            for (int i = 0; i < n; i++) {
+                if (y[i] == c) {
+                    double diff = X[i][j] - mean_c;
+                    within_class_var += diff * diff;
+                }
+            }
+        }
+        // 计算 Fisher Score: 分子大、分母小则得分高
+        scores[j] = (within_class_var < 1e-9) ? 0 : between_class_var / within_class_var;
+    }
+
+    // 排序并提取前 k 个索引
+    vector<int> indices(d);
+    iota(indices.begin(), indices.end(), 0);
+    sort(indices.begin(), indices.end(), [&](int a, int b) {
+        return scores[a] > scores[b];
+    });
+
+    if (k < d) indices.resize(k);
+    return indices;
+}
+
+vector<vector<double>> fisher_transform(const vector<vector<double>>& X, const vector<int>& indices) {
+    int n = X.size();
+    int k = indices.size();
+    vector<vector<double>> X_new(n, vector<double>(k));
+
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < k; j++) {
+            X_new[i][j] = X[i][indices[j]];
+        }
+    }
     return X_new;
 }

@@ -77,7 +77,7 @@ with torch.no_grad():
     for i in range(0, len(X_tensor), batch_size):
         batch = X_tensor[i:i+batch_size]
 
-        mu, _ = model.encode(batch)   # ⭐ 用 μ（确定性）
+        mu, _ = model.encode(batch)   # 用 μ（确定性）
         Z.append(mu.cpu().numpy())
 
 Z = np.vstack(Z)
