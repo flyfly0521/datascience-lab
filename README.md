@@ -1,7 +1,7 @@
 # datascience-lab
 ## Course Project 1: SVM Classification And Dimension Reduction
 
-**Author:** Zheng Feiyang 523031910654  
+**Author:** Zheng Feiyang 
 **Code Repository:** [flyfly0521/datascience-lab](https://github.com/flyfly0521/datascience-lab) (lab1 sub-folder)
 
 ---
